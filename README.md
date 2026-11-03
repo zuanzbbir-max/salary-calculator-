@@ -1,1 +1,445 @@
-# salary-calculator-
+
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Salary Calculator</title>
+<style>
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;font-family:Arial,sans-serif;background:#101827;color:white;padding:18px}
+header{text-align:center;padding:18px 0}
+header h1{font-size:25px;margin:0}
+header p{color:#aab5c5}
+nav{display:flex;gap:10px;margin:15px 0}
+nav button{flex:1}
+button{border:0;border-radius:10px;padding:13px;font-weight:bold;cursor:pointer;background:#26364c;color:white}
+button.active,.primary{background:#16a36a;color:white}
+.danger{background:#c83c46;color:white}
+.card{background:#1b293b;padding:17px;border-radius:14px;margin:13px 0}
+label{display:block;margin:12px 0 6px;color:#cbd5e1}
+input,select{width:100%;padding:13px;border:1px solid #40516a;border-radius:9px;background:#101827;color:white;font-size:16px}
+.result{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.result div{background:#26364c;padding:13px;border-radius:10px}
+.result small{color:#aab5c5}
+.result strong{display:block;margin-top:7px;font-size:19px}
+.record{border-bottom:1px solid #40516a;padding:13px 0}
+.record:last-child{border:0}
+.record button{margin-top:9px;padding:9px 13px}
+.hidden{display:none}
+.total{font-size:25px;color:#42dc9b;font-weight:bold}
+.muted{color:#aab5c5}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:24px;z-index:50}
+.overlay.hidden{display:none}
+.dialog{background:#1b293b;border-radius:14px;padding:20px;max-width:340px;width:100%}
+.dialog p{margin:0 0 16px;line-height:1.4}
+.dialog .row{display:flex;gap:10px}
+.dialog .row button{flex:1}
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#16a36a;color:white;padding:12px 18px;border-radius:10px;font-weight:bold;z-index:60;max-width:90%;text-align:center}
+#toast.hidden{display:none}
+.rates{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+h4{margin:16px 0 0;color:#cbd5e1}
+</style>
+</head>
+<body>
+
+<header>
+<h1>MY SALARY CALCULATOR</h1>
+<p>Kiraan Gaji Harian &amp; Bulanan</p>
+</header>
+
+<nav>
+<button id="tabCalc" class="active" onclick="showPage('calc')">KIRA GAJI</button>
+<button id="tabRecords" onclick="showPage('records')">REKOD</button>
+<button id="tabSettings" onclick="showPage('settings')">KADAR</button>
+</nav>
+
+<section id="calcPage">
+<div class="card">
+<h3>Maklumat Gaji</h3>
+
+<label>Tarikh</label>
+<input type="date" id="date" onchange="dateChanged()">
+
+<label>Jenis Hari</label>
+<select id="dayType" onchange="calculate()">
+<option value="normal">Isnin - Sabtu</option>
+<option value="sunday">Ahad</option>
+</select>
+
+<label id="lblNormal">Jam Biasa</label>
+<input type="number" id="normalHours" value="8" min="0" step="0.5" oninput="calculate()">
+
+<label id="lblOt">Jam OT</label>
+<input type="number" id="otHours" value="0" min="0" step="0.5" oninput="calculate()">
+
+<label>Elaun (RM)</label>
+<input type="number" id="allowance" value="0" min="0" step="0.01" oninput="calculate()">
+
+<label>Potongan (RM)</label>
+<input type="number" id="deduction" value="0" min="0" step="0.01" oninput="calculate()">
+</div>
+
+<div class="card">
+<h3>Keputusan Kiraan</h3>
+<div class="result">
+<div><small id="lblNormalPay">Gaji Biasa</small><strong id="normalPay">RM0.00</strong></div>
+<div><small id="lblOtPay">Gaji OT</small><strong id="otPay">RM0.00</strong></div>
+<div><small>Jumlah Kasar</small><strong id="grossPay">RM0.00</strong></div>
+<div><small>Gaji Bersih</small><strong id="netPay">RM0.00</strong></div>
+</div>
+<br>
+<button class="primary" style="width:100%" onclick="saveRecord()">SIMPAN REKOD</button>
+</div>
+</section>
+
+<section id="settingsPage" class="hidden">
+<div class="card">
+<h3>Kadar Gaji (RM sejam)</h3>
+<p class="muted">Kadar baharu digunakan untuk kiraan seterusnya. Rekod yang sudah disimpan tidak berubah.</p>
+<label>Kadar Asas (RM sejam)</label>
+<input type="number" id="rateBase" min="0" step="0.01" oninput="previewRates()">
+<div class="rates">
+<div><label>OT Isnin-Sabtu (x)</label><input type="number" id="multOt" min="0" step="0.1" oninput="previewRates()"></div>
+<div><label>Ahad (x)</label><input type="number" id="multSun" min="0" step="0.1" oninput="previewRates()"></div>
+</div>
+<h4>Kadar yang akan digunakan</h4>
+<div class="result" id="ratePreview" style="margin-top:10px"></div>
+<br>
+<button class="primary" style="width:100%" onclick="saveRatesFromForm()">SIMPAN KADAR</button>
+<button style="width:100%;margin-top:10px" onclick="resetRates()">KEMBALI KE KADAR ASAL</button>
+</div>
+</section>
+
+<section id="recordsPage" class="hidden">
+<div class="card">
+<h3>Jumlah Gaji Bulanan</h3>
+<label>Pilih Bulan</label>
+<input type="month" id="monthFilter" onchange="renderRecords()">
+<p class="muted">Jumlah gaji bersih</p>
+<div class="total" id="monthlyTotal">RM0.00</div>
+<p id="recordCount" class="muted">0 rekod</p>
+</div>
+
+<div class="card">
+<h3>Rekod Harian</h3>
+<div id="recordsList">Tiada rekod lagi.</div>
+<br>
+<button class="primary" style="width:100%;margin-bottom:10px" onclick="exportCSV()">EKSPORT CSV (BULAN DIPILIH)</button>
+<button class="danger" style="width:100%" onclick="deleteAll()">PADAM SEMUA REKOD</button>
+</div>
+</section>
+
+<div id="confirmBox" class="overlay hidden"><div class="dialog"><p id="confirmMsg"></p><div class="row"><button id="confirmNo">BATAL</button><button id="confirmYes" class="danger">YA</button></div></div></div>
+<div id="toast" class="hidden"></div>
+
+<script>
+const STORAGE_KEY = "mySalaryCalculatorRecords_v3";
+
+function getRecords(){
+  try{
+    const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    return Array.isArray(data) ? data : [];
+  }catch(e){
+    return [];
+  }
+}
+
+function saveRecords(records){
+  try{
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(records));
+    return true;
+  }catch(e){
+    toast("Rekod tidak dapat disimpan. Pelayar anda mungkin menyekat storan.");
+    return false;
+  }
+}
+
+// confirm() dan alert() disekat dalam halaman terbenam, jadi guna dialog sendiri
+function askConfirm(msg,onYes){
+  const box=document.getElementById("confirmBox");
+  document.getElementById("confirmMsg").textContent=msg;
+  box.classList.remove("hidden");
+  document.getElementById("confirmNo").onclick=()=>box.classList.add("hidden");
+  document.getElementById("confirmYes").onclick=()=>{box.classList.add("hidden");onYes();};
+}
+
+let toastTimer;
+function toast(msg){
+  const t=document.getElementById("toast");
+  t.textContent=msg;
+  t.classList.remove("hidden");
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.add("hidden"),2200);
+}
+
+const DEFAULT_SETTINGS={base:20,otMult:1.5,sunMult:2};
+const RATES_KEY="mySalaryRates_v1";
+
+function getSettings(){
+  try{
+    const d=JSON.parse(localStorage.getItem(RATES_KEY))||{};
+    const ok=v=>v!==undefined&&v!==null&&isFinite(Number(v))&&Number(v)>=0;
+    return {
+      base: ok(d.base)?Number(d.base):(ok(d.normal)?Number(d.normal):DEFAULT_SETTINGS.base),
+      otMult: ok(d.otMult)?Number(d.otMult):DEFAULT_SETTINGS.otMult,
+      sunMult: ok(d.sunMult)?Number(d.sunMult):DEFAULT_SETTINGS.sunMult
+    };
+  }catch(e){
+    return {...DEFAULT_SETTINGS};
+  }
+}
+
+// Semua kadar diterbitkan daripada kadar asas
+function deriveRates(s){
+  return {normal:s.base,ot:s.base*s.otMult,sunNormal:s.base*s.sunMult,sunOt:s.base*s.sunMult};
+}
+
+function getRates(){
+  return deriveRates(getSettings());
+}
+
+function readSettingsForm(){
+  const rd=id=>Math.max(0,Number(document.getElementById(id).value)||0);
+  return {base:rd("rateBase"),otMult:rd("multOt"),sunMult:rd("multSun")};
+}
+
+function previewRates(){
+  const s=readSettingsForm();
+  const r=deriveRates(s);
+  const items=[
+    ["Isnin-Sabtu biasa",r.normal],
+    ["Isnin-Sabtu OT ("+s.otMult+"x)",r.ot],
+    ["Ahad biasa ("+s.sunMult+"x)",r.sunNormal],
+    ["Ahad OT ("+s.sunMult+"x)",r.sunOt]
+  ];
+  const box=document.getElementById("ratePreview");
+  box.innerHTML="";
+  items.forEach(([label,val])=>{
+    const d=document.createElement("div");
+    const sm=document.createElement("small");
+    sm.textContent=label;
+    const st=document.createElement("strong");
+    st.textContent=money(val)+"/jam";
+    d.append(sm,st);
+    box.appendChild(d);
+  });
+}
+
+function loadRatesToForm(){
+  const s=getSettings();
+  document.getElementById("rateBase").value=s.base;
+  document.getElementById("multOt").value=s.otMult;
+  document.getElementById("multSun").value=s.sunMult;
+  previewRates();
+}
+
+function saveRatesFromForm(){
+  const s=readSettingsForm();
+  try{
+    localStorage.setItem(RATES_KEY,JSON.stringify(s));
+  }catch(e){
+    toast("Kadar tidak dapat disimpan.");
+    return;
+  }
+  loadRatesToForm();
+  calculate();
+  toast("Kadar disimpan.");
+}
+
+function resetRates(){
+  try{localStorage.removeItem(RATES_KEY);}catch(e){}
+  loadRatesToForm();
+  calculate();
+  toast("Kadar dikembalikan ke asal.");
+}
+
+async function exportCSV(){
+  const month=document.getElementById("monthFilter").value;
+  const records=getRecords().filter(r=>!month||r.date.startsWith(month));
+  if(records.length===0){
+    toast("Tiada rekod untuk dieksport.");
+    return;
+  }
+  const f=n=>Number(n||0).toFixed(2);
+  const head=["Tarikh","Jenis Hari","Jam Biasa","Jam OT","Elaun (RM)","Potongan (RM)","Gaji Biasa (RM)","Gaji OT (RM)","Jumlah Kasar (RM)","Gaji Bersih (RM)"];
+  const rows=records.map(r=>[r.date,r.dayType==="sunday"?"Ahad":"Isnin-Sabtu",r.normalHours,r.otHours,f(r.allowance),f(r.deduction),f(r.normalPay),f(r.otPay),f(r.gross),f(r.net)]);
+  const total=records.reduce((s,r)=>s+Number(r.net||0),0);
+  rows.push(["JUMLAH","","","","","","","","",f(total)]);
+  const csv="\uFEFF"+[head,...rows].map(row=>row.join(",")).join("\r\n");
+  try{
+    const dl=(window.claude&&window.claude.use)?await window.claude.use("downloads"):null;
+    if(!dl){
+      toast("Eksport tidak tersedia di sini.");
+      return;
+    }
+    await dl.save({filename:"gaji-"+(month||"semua")+".csv",data:csv});
+    toast("Fail CSV disimpan.");
+  }catch(e){
+    if(!e||e.code!=="declined") toast("Eksport gagal.");
+  }
+}
+
+function money(value){
+  return "RM" + Number(value).toFixed(2);
+}
+
+// Tarikh tempatan (bukan UTC) supaya tidak tersasar sehari selepas tengah malam
+function localDate(){
+  const d=new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+
+function dateChanged(){
+  const v=document.getElementById("date").value;
+  if(v){
+    const day=new Date(v+"T00:00:00").getDay();
+    document.getElementById("dayType").value = day===0 ? "sunday" : "normal";
+  }
+  calculate();
+}
+
+function calculate(){
+  const normalHours = Math.max(0,Number(document.getElementById("normalHours").value)||0);
+  const otHours = document.getElementById("dayType").value==="sunday" ? 0 : Math.max(0,Number(document.getElementById("otHours").value)||0);
+  const allowance = Math.max(0,Number(document.getElementById("allowance").value)||0);
+  const deduction = Math.max(0,Number(document.getElementById("deduction").value)||0);
+  const sunday = document.getElementById("dayType").value === "sunday";
+
+  const rates = getRates();
+  const normalRate = sunday ? rates.sunNormal : rates.normal;
+  const otRate = sunday ? rates.sunOt : rates.ot;
+
+  // Ahad: satu kadar sahaja (pengganda Ahad) untuk semua jam kerja
+  const normalPay = sunday ? 0 : normalHours * normalRate;
+  const otPay = sunday ? normalHours * otRate : otHours * otRate;
+  const gross = normalPay + otPay + allowance;
+  const net = gross - deduction;
+
+  const sunLabel = "(" + getSettings().sunMult + "x)";
+  document.getElementById("lblNormal").textContent = sunday ? "Jam Kerja Ahad " + sunLabel : "Jam Biasa";
+  document.getElementById("lblOt").style.display = sunday ? "none" : "";
+  document.getElementById("otHours").style.display = sunday ? "none" : "";
+  document.getElementById("lblNormalPay").textContent = sunday ? "Kadar Ahad " + sunLabel : "Gaji Biasa";
+  document.getElementById("lblOtPay").textContent = sunday ? "Gaji Ahad " + sunLabel : "Gaji OT";
+  document.getElementById("normalPay").textContent = sunday ? money(normalRate) + "/jam" : money(normalPay);
+  document.getElementById("otPay").textContent=money(otPay);
+  document.getElementById("grossPay").textContent=money(gross);
+  document.getElementById("netPay").textContent=money(net);
+
+  return {normalHours,otHours,allowance,deduction,normalPay,otPay,gross,net};
+}
+
+function saveRecord(){
+  const date=document.getElementById("date").value;
+  if(!date){
+    toast("Sila pilih tarikh dahulu.");
+    return;
+  }
+
+  const values=calculate();
+  const record={
+    date,
+    dayType:document.getElementById("dayType").value,
+    ...values
+  };
+
+  const records=getRecords();
+  const existing=records.findIndex(r=>r.date===date);
+
+  const doSave=()=>{
+    if(existing!==-1) records[existing]=record; else records.push(record);
+    records.sort((a,b)=>a.date.localeCompare(b.date));
+    if(!saveRecords(records)) return;
+    // Papar bulan rekod yang baru disimpan
+    document.getElementById("monthFilter").value=date.slice(0,7);
+    showPage("records");
+    toast("Rekod berjaya disimpan!");
+  };
+
+  if(existing!==-1){
+    askConfirm("Rekod tarikh ini sudah ada. Gantikan rekod lama?",doSave);
+  }else{
+    doSave();
+  }
+}
+
+function deleteRecord(date){
+  askConfirm("Padam rekod "+date+"?",()=>{
+    const records=getRecords().filter(r=>r.date!==date);
+    if(!saveRecords(records)) return;
+    renderRecords();
+    toast("Rekod telah dipadam.");
+  });
+}
+
+function deleteAll(){
+  askConfirm("Adakah kau pasti mahu padam SEMUA rekod?",()=>{
+    if(!saveRecords([])) return;
+    renderRecords();
+    toast("Semua rekod telah dipadam.");
+  });
+}
+
+function renderRecords(){
+  const month=document.getElementById("monthFilter").value;
+  const records=getRecords().filter(r=>!month||r.date.startsWith(month));
+  const total=records.reduce((sum,r)=>sum+Number(r.net||0),0);
+
+  document.getElementById("monthlyTotal").textContent=money(total);
+  document.getElementById("recordCount").textContent=records.length+" rekod";
+
+  const list=document.getElementById("recordsList");
+  list.innerHTML="";
+
+  if(records.length===0){
+    list.textContent="Tiada rekod untuk bulan ini.";
+    return;
+  }
+
+  records.slice().reverse().forEach(r=>{
+    const item=document.createElement("div");
+    item.className="record";
+
+    const heading=document.createElement("strong");
+    heading.textContent=r.date+" — "+(r.dayType==="sunday"?"Ahad":"Isnin-Sabtu");
+
+    const details=document.createElement("p");
+    details.className="muted";
+    details.textContent=r.dayType==="sunday"
+      ? "Semua OT: "+(Number(r.normalHours)+Number(r.otHours))+" jam"
+      : "Biasa: "+r.normalHours+" jam | OT: "+r.otHours+" jam";
+
+    const amount=document.createElement("p");
+    amount.textContent="Gaji bersih: "+money(r.net);
+
+    const del=document.createElement("button");
+    del.className="danger";
+    del.textContent="PADAM REKOD";
+    del.addEventListener("click",()=>deleteRecord(r.date));
+
+    item.append(heading,details,amount,del);
+    list.appendChild(item);
+  });
+}
+
+function showPage(page){
+  const pages={calc:["calcPage","tabCalc"],records:["recordsPage","tabRecords"],settings:["settingsPage","tabSettings"]};
+  for(const k in pages){
+    document.getElementById(pages[k][0]).classList.toggle("hidden",k!==page);
+    document.getElementById(pages[k][1]).classList.toggle("active",k===page);
+  }
+  if(page==="records") renderRecords();
+  if(page==="settings") loadRatesToForm();
+}
+
+document.getElementById("date").value=localDate();
+document.getElementById("monthFilter").value=localDate().slice(0,7);
+dateChanged();
+loadRatesToForm();
+renderRecords();
+</script>
+
+</body>
+</html>
