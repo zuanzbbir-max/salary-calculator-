@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>salry calculator</title>
+<title>Salary Calculator</title>
 <meta name="theme-color" id="themeColor" content="#f1f5f9">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -87,11 +87,11 @@ h4{margin:16px 0 0;color:var(--label)}
 <option value="sunday">Ahad</option>
 <option value="holiday">Cuti Umum</option>
 </select>
-<label>Masuk / Keluar</label>
-<div class="row2" style="grid-template-columns:1fr 1fr"><input type="time" id="tIn" oninput="autoHours()"><input type="time" id="tOut" oninput="autoHours()"></div>
-<p class="muted" style="font-size:13px">Jadual standard: biasa 08:00-16:45 (rehat 10:00, 12:00, 15:00). OT bermula 17:15, dengan rehat 19:15, 20:30, 00:00 dan 03:45. Waktu rehat dan 16:45-17:15 tidak dikira.</p>
+<label>Masuk / Keluar (format 24 jam)</label>
+<div class="row2" style="grid-template-columns:1fr 1fr"><input type="text" id="tIn" inputmode="numeric" maxlength="5" placeholder="08:00" autocomplete="off" oninput="fmtT(this)"><input type="text" id="tOut" inputmode="numeric" maxlength="5" placeholder="17:15" autocomplete="off" oninput="fmtT(this)"></div>
+<p class="muted" style="font-size:13px">Jadual standard: biasa 08:00-16:45 (rehat 12:00-12:45 sahaja). OT bermula 17:15, dengan rehat 19:15, 20:30, 00:00 dan 03:45. Waktu rehat dan 16:45-17:15 tidak dikira.</p>
 <label id="lblNormal">Jam Biasa</label>
-<input type="number" id="normalHours" value="7.5" min="0" step="0.01" oninput="calculate()">
+<input type="number" id="normalHours" value="8" min="0" step="0.01" oninput="calculate()">
 <label id="lblOt">Jam OT</label>
 <input type="number" id="otHours" value="0" min="0" step="0.01" oninput="calculate()">
 </div>
@@ -199,11 +199,13 @@ function saveRates(){if(!wr(RK,JSON.stringify(readS())))return;loadRatesToForm()
 function resetRates(){try{localStorage.removeItem(RK)}catch(e){}loadRatesToForm();autoHours();toast("Tetapan dikembalikan ke asal.")}
 
 function dateChanged(){const v=$("date").value;if(v){const sun=new Date(v+"T00:00:00").getDay()===0,t=$("dayType");if(sun)t.value="sunday";else if(t.value==="sunday")t.value="normal"}autoHours()}
-const NORM=[[480,600],[615,720],[765,900],[915,1005]];
+const okT=x=>/^([01]\d|2[0-3]):[0-5]\d$/.test(x);
+function fmtT(el){let v=el.value.replace(/\D/g,"").slice(0,4);if(v.length>2)v=v.slice(0,2)+":"+v.slice(2);el.value=v;autoHours()}
+const NORM=[[480,720],[765,1005]];
 const OTI=[[1035,1155],[1170,1230],[1260,1440],[1485,1665],[1680,1800]];
 function ov(a,b,L){return L.reduce((s,[x,y])=>s+Math.max(0,Math.min(b,y)-Math.max(a,x)),0)}
 function autoHours(){const a=$("tIn").value,b=$("tOut").value;
-  if(a&&b){const m=x=>{const[h,i]=x.split(":");return+h*60+ +i};const s0=m(a);let e0=m(b);if(e0<=s0)e0+=1440;
+  if(okT(a)&&okT(b)){const m=x=>{const[h,i]=x.split(":");return+h*60+ +i};const s0=m(a);let e0=m(b);if(e0<=s0)e0+=1440;
     const n=ov(s0,e0,NORM)/60,o=ov(s0,e0,OTI)/60;
     if($("dayType").value==="normal"){$("normalHours").value=+n.toFixed(2);$("otHours").value=+o.toFixed(2)}
     else $("normalHours").value=+(n+o).toFixed(2)}
@@ -225,7 +227,7 @@ function startEdit(d){const r=getRecords().find(x=>x.date===d);if(!r)return;edit
   $("date").value=r.date;$("dayType").value=r.dayType||"normal";$("tIn").value=r.tIn||"";$("tOut").value=r.tOut||"";
   $("normalHours").value=r.normalHours;$("otHours").value=r.otHours;showEdit();showPage("calc");calculate()}
 function saveRecord(){const date=$("date").value;if(!date)return toast("Sila pilih tarikh dahulu.");
-  const rec={date,dayType:$("dayType").value,tIn:$("tIn").value,tOut:$("tOut").value,...calculate()};
+  const rec={date,dayType:$("dayType").value,tIn:okT($("tIn").value)?$("tIn").value:"",tOut:okT($("tOut").value)?$("tOut").value:"",...calculate()};
   const recs=getRecords(),dup=recs.some(r=>r.date===date);
   const go=()=>{const L=recs.filter(r=>r.date!==date&&r.date!==editDate);L.push(rec);L.sort((a,b)=>a.date.localeCompare(b.date));
     if(!saveRecords(L))return;editDate=null;showEdit();$("monthFilter").value=date.slice(0,7);showPage("records");toast("Rekod berjaya disimpan!")};
