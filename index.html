@@ -84,6 +84,26 @@ input,select{padding:10px}
 .btns{flex-wrap:wrap}
 .record button{padding:8px 10px}
 }
+.fold{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;margin-top:8px;padding:12px 14px}
+.fold span:last-child{color:var(--total)}
+html{-webkit-text-size-adjust:100%;overflow-x:hidden}
+*{-webkit-tap-highlight-color:transparent}
+button,input,select{touch-action:manipulation}
+button{min-height:44px}
+nav{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:20px;line-height:1;padding:8px 4px;min-height:56px}
+nav button small{font-size:11px;font-weight:bold;letter-spacing:.3px}
+input[type=date],input[type=month]{min-height:46px;-webkit-appearance:none;appearance:none}
+.lock{min-height:100dvh}
+@media (max-width:600px){
+header{display:grid;grid-template-columns:1fr auto;align-items:center;text-align:left;padding:6px 0 2px;gap:0 8px}
+header h1{font-size:18px;grid-column:1}
+header p{grid-column:1;margin:2px 0 0;font-size:12px}
+header .themeBtn{grid-column:2;grid-row:1/3;padding:8px 12px}
+.overlay{align-items:flex-end;padding:0}
+.dialog{max-width:none;border-radius:18px 18px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom,0px))}
+.dialog .row button{min-height:48px}
+}
 </style>
 </head>
 <body>
@@ -95,9 +115,9 @@ input,select{padding:10px}
 </header>
 
 <nav>
-<button id="tabCalc" class="active" onclick="showPage('calc')">KIRA</button>
-<button id="tabRecords" onclick="showPage('records')">REKOD</button>
-<button id="tabSettings" onclick="showPage('settings')">TETAPAN</button>
+<button id="tabCalc" class="active" onclick="showPage('calc')">🧮<small>KIRA</small></button>
+<button id="tabRecords" onclick="showPage('records')">📋<small>REKOD</small></button>
+<button id="tabSettings" onclick="showPage('settings')">⚙️<small>TETAPAN</small></button>
 </nav>
 
 <section id="calcPage">
@@ -203,7 +223,7 @@ const $=id=>document.getElementById(id);
 const rd=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 const wr=(k,v)=>{try{localStorage.setItem(k,v);return true}catch(e){toast("Tidak dapat menyimpan.");return false}};
 const money=v=>"RM"+Number(v).toFixed(2);
-let editDate=null,tt,lastSp=false;
+let editDate=null,tt,lastSp=false,lastMo=null;const openM=new Set();
 
 function currentTheme(){const a=document.documentElement.getAttribute("data-theme");if(a==="dark"||a==="light")return a;return(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"}
 function applyTheme(t){document.documentElement.setAttribute("data-theme",t);$("themeBtn").textContent=t==="dark"?"\u2600\uFE0F Mod Siang":"\uD83C\uDF19 Mod Malam";$("themeColor").setAttribute("content",t==="dark"?"#000000":"#f1f5f9")}
@@ -292,16 +312,26 @@ function renderRecords(){const mo=$("monthFilter").value,rs=getRecords().filter(
     const mx=Math.max(...Object.values(wk));t+='<p class="muted" style="margin-bottom:2px">Gaji mingguan</p>';
     Object.keys(wk).sort().forEach(w=>{t+='<div class="wk"><span>Minggu '+w+'</span><div class="bar"><i style="width:'+(mx?wk[w]/mx*100:0)+'%"></i></div><b>'+money(wk[w])+'</b></div>'})}
   $("summary").innerHTML=t;
-  const L=$("recordsList");L.innerHTML="";if(!rs.length){L.textContent="Tiada rekod untuk bulan ini.";return}
-  rs.slice().reverse().forEach(r=>{const it=document.createElement("div"),sp=(r.dayType||"normal")!=="normal";it.className="record";
-    const hd=document.createElement("strong");hd.textContent=r.date+" — "+(TL[r.dayType]||TL.normal);
-    const dt=document.createElement("p");dt.className="muted";
-    dt.textContent=(sp?"Jam kerja: "+r.normalHours:"Biasa: "+r.normalHours+" jam | OT: "+r.otHours+" jam")+(r.tIn&&r.tOut?" | "+r.tIn+"-"+r.tOut:"");
-    const am=document.createElement("p");am.textContent="Jumlah gaji: "+money(r.net);
-    const bt=document.createElement("div");bt.className="btns";
-    const ed=document.createElement("button");ed.textContent="UBAH";ed.onclick=()=>startEdit(r.date);
-    const dl=document.createElement("button");dl.className="danger";dl.textContent="PADAM";dl.onclick=()=>deleteRecord(r.date);
-    bt.append(ed,dl);it.append(hd,dt,am,bt);L.appendChild(it)})}
+  if(mo!==lastMo){if(mo)openM.add(mo);lastMo=mo}
+  const L=$("recordsList");L.innerHTML="";const all=getRecords();if(!all.length){L.textContent="Tiada rekod lagi.";return}
+  const MN=["Januari","Februari","Mac","April","Mei","Jun","Julai","Ogos","September","Oktober","November","Disember"],G={};
+  all.forEach(r=>{const k=r.date.slice(0,7);(G[k]=G[k]||[]).push(r)});
+  Object.keys(G).sort().reverse().forEach(k=>{const g=G[k],open=openM.has(k);
+    const hb=document.createElement("button");hb.className="fold";
+    const s1=document.createElement("span");s1.textContent=(open?"\u25BE ":"\u25B8 ")+MN[+k.slice(5)-1]+" "+k.slice(0,4)+" ("+g.length+")";
+    const s2=document.createElement("span");s2.textContent=money(g.reduce((x,r)=>x+(+r.net||0),0));
+    hb.append(s1,s2);hb.onclick=()=>{open?openM.delete(k):openM.add(k);$("monthFilter").value=k;lastMo=k;renderRecords()};
+    L.appendChild(hb);
+    if(open){const box=document.createElement("div");g.slice().reverse().forEach(r=>box.appendChild(recItem(r)));L.appendChild(box)}})}
+function recItem(r){const it=document.createElement("div"),sp=(r.dayType||"normal")!=="normal";it.className="record";
+  const hd=document.createElement("strong");hd.textContent=r.date+" \u2014 "+(TL[r.dayType]||TL.normal);
+  const dt=document.createElement("p");dt.className="muted";
+  dt.textContent=(sp?"Jam kerja: "+r.normalHours:"Biasa: "+r.normalHours+" jam | OT: "+r.otHours+" jam")+(r.tIn&&r.tOut?" | "+r.tIn+"-"+r.tOut:"");
+  const am=document.createElement("p");am.textContent="Jumlah gaji: "+money(r.net);
+  const bt=document.createElement("div");bt.className="btns";
+  const ed=document.createElement("button");ed.textContent="UBAH";ed.onclick=()=>startEdit(r.date);
+  const dl=document.createElement("button");dl.className="danger";dl.textContent="PADAM";dl.onclick=()=>deleteRecord(r.date);
+  bt.append(ed,dl);it.append(hd,dt,am,bt);return it}
 
 async function saveFile(name,data){try{const d=(window.claude&&window.claude.use)?await window.claude.use("downloads"):null;
   if(!d)return toast("Muat turun tidak tersedia di sini.");await d.save({filename:name,data});toast("Fail disimpan.")}catch(e){if(!e||e.code!=="declined")toast("Gagal menyimpan fail.")}}
