@@ -55,6 +55,7 @@ h4{margin:16px 0 0;color:var(--label)}
 .banner{background:var(--field);padding:10px;border-radius:10px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .banner button{padding:6px 12px}
 .banner.hidden{display:none}
+#ptr{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));left:50%;margin-left:-85px;width:170px;text-align:center;background:#db2777;color:#fff;padding:8px;border-radius:20px;font-size:13px;font-weight:bold;opacity:0;z-index:30;pointer-events:none;transform:translateY(-40px)}
 .row2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .btns{display:flex;gap:8px}.btns button{flex:1}
 .lock{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px}
@@ -185,6 +186,7 @@ input,select{padding:10px}
 
 <div id="lock" class="lock"><h2>🔒 Masukkan PIN</h2><input type="password" id="pinIn" inputmode="numeric" maxlength="4" autocomplete="off" oninput="if(this.value.length===4)unlock()"><p id="lockErr" class="muted"></p></div>
 <div id="confirmBox" class="overlay hidden"><div class="dialog"><p id="confirmMsg"></p><div class="row"><button id="confirmNo">BATAL</button><button id="confirmYes" class="danger">YA</button></div></div></div>
+<div id="ptr">Tarik untuk refresh</div>
 <div id="toast" class="hidden"></div>
 
 <script>
@@ -308,6 +310,12 @@ function showPage(pg){const P={calc:["calcPage","tabCalc"],records:["recordsPage
   for(const k in P){$(P[k][0]).classList.toggle("hidden",k!==pg);$(P[k][1]).classList.toggle("active",k===pg)}
   if(pg==="records")renderRecords();if(pg==="settings"){loadRatesToForm();pinState()}}
 
+(function(){let y0=null,dy=0;const ind=$("ptr");
+  addEventListener("touchstart",e=>{y0=(window.scrollY<=0&&!e.target.closest("input,select,textarea,.lock,.overlay"))?e.touches[0].clientY:null;dy=0},{passive:true});
+  addEventListener("touchmove",e=>{if(y0===null)return;dy=e.touches[0].clientY-y0;
+    if(dy>10){ind.style.transform="translateY("+(-40+Math.min(dy,100)*0.6)+"px)";ind.style.opacity=Math.min(1,dy/70);ind.textContent=dy>70?"Lepaskan untuk refresh":"Tarik untuk refresh"}else ind.style.opacity=0},{passive:true});
+  addEventListener("touchend",()=>{if(y0!==null&&dy>70){ind.textContent="Memuat semula...";location.reload();return}ind.style.opacity=0;ind.style.transform="translateY(-40px)";y0=null},{passive:true});
+})();
 if(!rd(PK))$("lock").classList.add("hidden");
 $("date").value=localDate();$("monthFilter").value=localDate().slice(0,7);
 applyTheme(currentTheme());dateChanged();loadRatesToForm();renderRecords();pinState();
