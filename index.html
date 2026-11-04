@@ -86,6 +86,9 @@ input,select{padding:10px}
 }
 .fold{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;margin-top:8px;padding:12px 14px}
 .fold span:last-child{color:var(--total)}
+.srow{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:15px}
+.srow.b{font-weight:bold}
+.srow.tot{font-weight:bold;font-size:19px;color:var(--total);border:0;padding-top:12px}
 html{-webkit-text-size-adjust:100%;overflow-x:hidden}
 *{-webkit-tap-highlight-color:transparent}
 button,input,select{touch-action:manipulation}
@@ -122,6 +125,7 @@ header .themeBtn{grid-column:2;grid-row:1/3;padding:8px 12px}
 
 <section id="calcPage">
 <div id="editBanner" class="banner hidden"><span id="editTxt"></span><button onclick="cancelEdit()">BATAL</button></div>
+<div class="card" onclick="showPage('records')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="muted">Gaji bersih bulan ini (anggaran)</span><strong id="netChipV" class="total" style="font-size:20px">RM0.00</strong></div>
 <div class="card">
 <h3>Maklumat Gaji</h3>
 <label>Tarikh</label>
@@ -136,7 +140,7 @@ header .themeBtn{grid-column:2;grid-row:1/3;padding:8px 12px}
 <div class="row2" style="grid-template-columns:1fr 1fr"><input type="text" id="tIn" inputmode="decimal" maxlength="8" placeholder="08:00" autocomplete="off" oninput="autoHours()" onblur="normT(this)"><input type="text" id="tOut" inputmode="decimal" maxlength="8" placeholder="17:15" autocomplete="off" oninput="autoHours()" onblur="normT(this)"></div>
 <p class="muted" style="font-size:13px">Boleh taip bebas: 0800, 8.30, 17:15 atau 5pm. Isnin-Sabtu: masuk sebelum 12:00 = shift penuh (jam biasa dan OT dikira), masuk selepas 12:00 = masa OT sahaja (macam timesheet). Ahad dan Cuti Umum: masuk dan keluar penuh, dengan rehat 10:00, 12:00, 15:00 dan 16:45-17:15 ditolak. Rehat OT 19:15-19:30, 20:30-21:00, 00:00-00:45 dan 03:45-04:00 ditolak sendiri.</p>
 <label id="lblNormal">Jam Biasa</label>
-<input type="number" id="normalHours" value="8" min="0" step="0.01" oninput="calculate()">
+<input type="number" id="normalHours" value="7.5" min="0" step="0.01" oninput="calculate()">
 <label id="lblOt">Jam OT</label>
 <input type="number" id="otHours" value="0" min="0" step="0.01" oninput="calculate()">
 </div>
@@ -163,10 +167,20 @@ header .themeBtn{grid-column:2;grid-row:1/3;padding:8px 12px}
 <h3>Jumlah Gaji Bulanan</h3>
 <label>Pilih Bulan</label>
 <input type="month" id="monthFilter" onchange="renderRecords()">
-<p class="muted">Jumlah gaji</p>
+<p class="muted" id="netLbl">Gaji bersih (anggaran)</p>
 <div class="total" id="monthlyTotal">RM0.00</div>
 <p id="recordCount" class="muted">0 rekod</p>
 <div id="summary"></div>
+</div>
+<div class="card">
+<h3>Slip Gaji (Anggaran)</h3>
+<p class="muted" style="font-size:13px">Dikira ikut slip gaji syarikat: gaji asas + OT, tolak EPF, EIS, SOCSO, PCB, SKBBK dan advance. Hari asas = hari Isnin-Sabtu yang dibayar (7.5 jam sehari). PCB tidak boleh dikira tepat oleh app, jadi isi nilai dari slip anda.</p>
+<div class="row2">
+<div><label>Hari asas</label><input type="number" id="slDays" min="0" step="0.5" oninput="slipInput()"></div>
+<div><label>PCB (RM)</label><input type="number" id="slPcb" min="0" step="0.01" oninput="slipInput('pcb')"></div>
+<div><label>Advance (RM)</label><input type="number" id="slAdv" min="0" step="0.01" oninput="slipInput()"></div>
+</div>
+<div id="slipOut" style="margin-top:12px"></div>
 </div>
 <div class="card">
 <h3>Rekod Harian</h3>
@@ -187,9 +201,12 @@ header .themeBtn{grid-column:2;grid-row:1/3;padding:8px 12px}
 <div><label>OT Isnin-Sabtu (x)</label><input type="number" id="multOt" min="0" step="0.1" oninput="previewRates()"></div>
 <div><label>Ahad (x)</label><input type="number" id="multSun" min="0" step="0.1" oninput="previewRates()"></div>
 <div><label>Cuti Umum (x)</label><input type="number" id="multHol" min="0" step="0.1" oninput="previewRates()"></div>
+<div><label>Cuti Umum pada Ahad (x)</label><input type="number" id="multSunHol" min="0" step="0.1" oninput="previewRates()"></div>
 </div>
 <label>Sasaran gaji bulanan (RM, 0 = tiada)</label>
 <input type="number" id="target" min="0" step="1">
+<label>Potongan tetap bulanan - SKBBK (RM)</label>
+<input type="number" id="skbbk" min="0" step="0.01">
 <h4>Kadar yang akan digunakan</h4>
 <div class="result" id="ratePreview" style="margin-top:10px"></div>
 <br>
@@ -217,7 +234,7 @@ header .themeBtn{grid-column:2;grid-row:1/3;padding:8px 12px}
 
 <script>
 const KEY="mySalaryCalculatorRecords_v3",RK="mySalaryRates_v1",TK="mySalaryTheme",PK="mySalaryPin";
-const DEF={base:20,otMult:1.5,sunMult:2,holMult:2,dayHrs:8,target:0};
+const DEF={base:20,otMult:1.5,sunMult:2,holMult:2,sunHolMult:3,dayHrs:8,target:0,skbbk:44.65};
 const TL={normal:"Isnin-Sabtu",sunday:"Ahad",holiday:"Cuti Umum"};
 const $=id=>document.getElementById(id);
 const rd=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
@@ -240,17 +257,17 @@ function getSettings(){let d={};try{d=JSON.parse(rd(RK))||{}}catch(e){}
   const ok=v=>v!==undefined&&v!==null&&isFinite(Number(v))&&Number(v)>=0,s={};
   for(const k in DEF)s[k]=ok(d[k])?Number(d[k]):(k==="base"&&ok(d.normal)?Number(d.normal):DEF[k]);
   if(!s.dayHrs)s.dayHrs=8;return s}
-function deriveRates(s){return{normal:s.base,ot:s.base*s.otMult,sun:s.base*s.sunMult,hol:s.base*s.holMult}}
-function readS(){const g=id=>Math.max(0,+$(id).value||0);return{base:g("rateBase"),otMult:g("multOt"),sunMult:g("multSun"),holMult:g("multHol"),target:g("target")}}
+function deriveRates(s){return{normal:s.base,ot:s.base*s.otMult,sun:s.base*s.sunMult,hol:s.base*s.holMult,sunhol:s.base*s.sunHolMult}}
+function readS(){const g=id=>Math.max(0,+$(id).value||0);return{base:g("rateBase"),otMult:g("multOt"),sunMult:g("multSun"),holMult:g("multHol"),sunHolMult:g("multSunHol"),target:g("target"),skbbk:g("skbbk")}}
 function previewRates(){const s=readS(),r=deriveRates(s);
-  const it=[["Isnin-Sabtu biasa",r.normal],["Isnin-Sabtu OT ("+s.otMult+"x)",r.ot],["Ahad ("+s.sunMult+"x)",r.sun],["Cuti Umum ("+s.holMult+"x)",r.hol]];
+  const it=[["Isnin-Sabtu biasa",r.normal],["Isnin-Sabtu OT ("+s.otMult+"x)",r.ot],["Ahad ("+s.sunMult+"x)",r.sun],["Cuti Umum ("+s.holMult+"x)",r.hol],["Cuti Umum Ahad ("+s.sunHolMult+"x)",r.sunhol]];
   const b=$("ratePreview");b.innerHTML="";
   it.forEach(([l,v])=>{const d=document.createElement("div"),a=document.createElement("small"),c=document.createElement("strong");a.textContent=l;c.textContent=money(v)+"/jam";d.append(a,c);b.appendChild(d)})}
-function loadRatesToForm(){const s=getSettings();$("rateBase").value=s.base;$("multOt").value=s.otMult;$("multSun").value=s.sunMult;$("multHol").value=s.holMult;$("target").value=s.target;previewRates()}
+function loadRatesToForm(){const s=getSettings();$("rateBase").value=s.base;$("multOt").value=s.otMult;$("multSun").value=s.sunMult;$("multHol").value=s.holMult;$("multSunHol").value=s.sunHolMult;$("target").value=s.target;$("skbbk").value=s.skbbk;previewRates()}
 function saveRates(){if(!wr(RK,JSON.stringify(readS())))return;loadRatesToForm();autoHours();toast("Tetapan disimpan.")}
 function resetRates(){try{localStorage.removeItem(RK)}catch(e){}loadRatesToForm();autoHours();toast("Tetapan dikembalikan ke asal.")}
 
-function dateChanged(){const v=$("date").value;if(v){const sun=new Date(v+"T00:00:00").getDay()===0,t=$("dayType");if(sun)t.value="sunday";else if(t.value==="sunday")t.value="normal"}typeChanged()}
+function dateChanged(){const v=$("date").value;if(v){const sun=new Date(v+"T00:00:00").getDay()===0,t=$("dayType");if(sun){if(t.value!=="holiday")t.value="sunday"}else if(t.value==="sunday")t.value="normal"}typeChanged()}
 function parseT(x){x=(x||"").trim().toLowerCase();const pm=/pm$/.test(x),am=/am$/.test(x);x=x.replace(/[ap]m$/,"").trim();let h,mi;
   if(/^\d{1,2}[:.]\d{2}$/.test(x))[h,mi]=x.split(/[:.]/).map(Number);
   else if(/^\d{1,2}$/.test(x)){h=+x;mi=0}
@@ -261,11 +278,11 @@ function parseT(x){x=(x||"").trim().toLowerCase();const pm=/pm$/.test(x),am=/am$
 function normT(el){const v=parseT(el.value);if(v)el.value=v}
 const okT=x=>/^([01]\d|2[0-3]):[0-5]\d$/.test(x);
 function fmtT(el){let v=el.value.replace(/\D/g,"").slice(0,4);if(v.length>2)v=v.slice(0,2)+":"+v.slice(2);el.value=v;autoHours()}
-const NORM=[[480,720],[765,1005]];
+const NORM=[[480,600],[615,720],[765,900],[915,1005]];
 const OTI=[[1035,1155],[1170,1230],[1260,1440],[1485,1665],[1680,1800]];
 const BR_OT=[[1155,1170],[1230,1260],[1440,1485],[1665,1680]];
 const BR_ALL=[[600,615],[720,765],[900,915],[1005,1035],...BR_OT];
-function typeChanged(){const sp=$("dayType").value!=="normal";if(!sp&&lastSp)$("normalHours").value=8;lastSp=sp;autoHours()}
+function typeChanged(){const sp=$("dayType").value!=="normal";if(!sp&&lastSp)$("normalHours").value=7.5;lastSp=sp;autoHours()}
 function ov(a,b,L){return L.reduce((s,[x,y])=>s+Math.max(0,Math.min(b,y)-Math.max(a,x)),0)}
 function autoHours(){const a=parseT($("tIn").value),b=parseT($("tOut").value);
   if(a&&b){const m=x=>{const[h,i]=x.split(":");return+h*60+ +i};const s0=m(a);let e0=m(b);if(e0<=s0)e0+=1440;
@@ -276,8 +293,8 @@ function autoHours(){const a=parseT($("tIn").value),b=parseT($("tOut").value);
   calculate()}
 function calculate(){const s=getSettings(),r=deriveRates(s),t=$("dayType").value,sp=t!=="normal";
   const nh=Math.max(0,+$("normalHours").value||0),oh=sp?0:Math.max(0,+$("otHours").value||0);
-  const rate=t==="sunday"?r.sun:r.hol,np=sp?0:nh*r.normal,op=sp?nh*rate:oh*r.ot,net=np+op;
-  const mult=t==="sunday"?s.sunMult:s.holMult,nm=TL[t];
+  const hs=t==="holiday"&&isSunDate($("date").value),rate=t==="sunday"?r.sun:(hs?r.sunhol:r.hol),np=sp?0:nh*r.normal,op=sp?nh*rate:oh*r.ot,net=np+op;
+  const mult=t==="sunday"?s.sunMult:(hs?s.sunHolMult:s.holMult),nm=hs?"Cuti Umum Ahad":TL[t];
   $("lblNormal").textContent=sp?"Jam Kerja "+nm+" ("+mult+"x)":"Jam Biasa";
   $("lblTime").textContent="Masuk / Keluar (24 jam)";
   $("lblOt").style.display=$("otHours").style.display=sp?"none":"";
@@ -301,17 +318,17 @@ function deleteRecord(d){askConfirm("Padam rekod "+d+"?",()=>{if(saveRecords(get
 function deleteAll(){askConfirm("Adakah kau pasti mahu padam SEMUA rekod?",()=>{if(saveRecords([])){renderRecords();toast("Semua rekod telah dipadam.")}})}
 
 function renderRecords(){const mo=$("monthFilter").value,rs=getRecords().filter(r=>!mo||r.date.startsWith(mo));
-  const tot=rs.reduce((a,r)=>a+(+r.net||0),0),s=getSettings();
+  const s=getSettings(),sl=mo?slipCalc(mo):null,tot=sl?sl.net:rs.reduce((a,r)=>a+(+r.net||0),0);
   $("monthlyTotal").textContent=money(tot);$("recordCount").textContent=rs.length+" rekod";
   let nh=0,oh=0,sh=0;const wk={};
   rs.forEach(r=>{if((r.dayType||"normal")==="normal"){nh+=+r.normalHours||0;oh+=+r.otHours||0}else sh+=+r.normalHours||0;
     const w=Math.ceil(+r.date.slice(8,10)/7);wk[w]=(wk[w]||0)+(+r.net||0)});
-  let t="";
+  let t=sl?'<p class="muted">Kasar '+money(sl.gross)+' | Potongan '+money(sl.gross-sl.net)+'</p>':"";
   if(rs.length){t+='<p class="muted">Hari bekerja: '+rs.length+' | Jam biasa: '+nh.toFixed(1)+' | OT: '+oh.toFixed(1)+' | Ahad/Cuti: '+sh.toFixed(1)+'</p>';
     if(s.target>0){const p=Math.min(100,tot/s.target*100);t+='<p class="muted">Sasaran '+money(s.target)+': '+p.toFixed(0)+'% ('+(tot>=s.target?'tercapai':'baki '+money(s.target-tot))+')</p><div class="bar"><i style="width:'+p+'%"></i></div>'}
     const mx=Math.max(...Object.values(wk));t+='<p class="muted" style="margin-bottom:2px">Gaji mingguan</p>';
     Object.keys(wk).sort().forEach(w=>{t+='<div class="wk"><span>Minggu '+w+'</span><div class="bar"><i style="width:'+(mx?wk[w]/mx*100:0)+'%"></i></div><b>'+money(wk[w])+'</b></div>'})}
-  $("summary").innerHTML=t;
+  $("summary").innerHTML=t;renderSlip();updateNetChip();$("netLbl").textContent=mo?"Gaji bersih (anggaran)":"Jumlah rekod harian (semua bulan)";
   if(mo!==lastMo){if(mo)openM.add(mo);lastMo=mo}
   const L=$("recordsList");L.innerHTML="";const all=getRecords();if(!all.length){L.textContent="Tiada rekod lagi.";return}
   const MN=["Januari","Februari","Mac","April","Mei","Jun","Julai","Ogos","September","Oktober","November","Disember"],G={};
@@ -355,7 +372,8 @@ async function setPin(){const p=$("newPin").value;if(!/^\d{4}$/.test(p))return t
 function removePin(){askConfirm("Buang kunci PIN?",()=>{try{localStorage.removeItem(PK)}catch(e){}pinState();toast("PIN dibuang.")})}
 function pinState(){$("pinStatus").textContent=rd(PK)?"Kunci PIN: HIDUP":"Kunci PIN: MATI"}
 
-function payOf(t,nh,oh){const r=deriveRates(getSettings()),sp=t!=="normal",rate=t==="sunday"?r.sun:r.hol;
+function isSunDate(d){return !!d&&new Date(d+"T00:00:00").getDay()===0}
+function payOf(t,nh,oh,d){const r=deriveRates(getSettings()),sp=t!=="normal",rate=t==="sunday"?r.sun:(t==="holiday"&&isSunDate(d)?r.sunhol:r.hol);
   const np=sp?0:nh*r.normal,op=sp?nh*rate:oh*r.ot;return{normalPay:np,otPay:op,gross:np+op,net:np+op}}
 const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
 function loadScript(u){return new Promise((ok,no)=>{const s=document.createElement("script");s.src=u;s.onload=ok;s.onerror=no;document.head.appendChild(s)})}
@@ -379,18 +397,43 @@ async function importPdf(inp){const f=inp.files[0];if(!f)return;
         const[d,mo]=cols[k].s.split("-"),mm=MON[mo.toLowerCase()];if(!mm)return;
         const date=(mm<m0?yr+1:yr)+"-"+String(mm).padStart(2,"0")+"-"+d.padStart(2,"0");
         let nh,oh,type;
-        if(nums.length>=2){type="normal";nh=+nums[0].s;oh=+nums[1].s}
+        if(nums.length>=2){type="normal";nh=7.5;oh=+nums[1].s}
         else if(k===0){type="sunday";nh=+nums[0].s;oh=0}
-        else{type="normal";nh=8;oh=+nums[0].s}
+        else{type="normal";nh=7.5;oh=+nums[0].s}
         out.push({date,dayType:type,tIn:parseT(tm[0].s)||"",tOut:parseT(tm[1].s)||"",brk:0,normalHours:nh,otHours:oh,...payOf(type,nh,oh)})});
     }
     if(!out.length)throw 0;
     out.sort((a,b)=>a.date.localeCompare(b.date));
     askConfirm("Ditemui "+out.length+" rekod ("+out[0].date+" hingga "+out[out.length-1].date+"). Import? Rekod bertarikh sama akan diganti.",()=>{
       const m=new Map(getRecords().map(r=>[r.date,r]));out.forEach(r=>m.set(r.date,r));
-      if(saveRecords([...m.values()].sort((a,b)=>a.date.localeCompare(b.date)))){$("monthFilter").value=out[out.length-1].date.slice(0,7);showPage("records");toast("Import berjaya: "+out.length+" rekod.")}})
+      if(saveRecords([...m.values()].sort((a,b)=>a.date.localeCompare(b.date)))){$("monthFilter").value=out[out.length-1].date.slice(0,7);showPage("records");toast("Import berjaya: "+out.length+" rekod. Gaji bersih anggaran "+money(slipCalc($("monthFilter").value).net))}})
   }catch(e){toast("Tidak dapat baca PDF ini.")}
   inp.value=""}
+function updateNetChip(){$("netChipV").textContent=money(slipCalc(localDate().slice(0,7)).net)}
+const SLK="mySalarySlip_v1";
+function slipAll(){try{return JSON.parse(rd(SLK))||{}}catch(e){return{}}}
+function monthDays(mo){const[y,m]=mo.split("-").map(Number);let n=0;for(let d=1,L=new Date(y,m,0).getDate();d<=L;d++)if(new Date(y,m-1,d).getDay()!==0)n++;return n}
+function slipIn(mo){const A=slipAll(),o=A[mo]||{};let pcb=o.pcb,auto=false;
+  if(pcb==null){const ks=Object.keys(A).filter(k=>k<mo&&A[k].pcb!=null).sort();pcb=ks.length?A[ks[ks.length-1]].pcb:0;auto=ks.length>0}
+  return{days:o.days!=null?+o.days:monthDays(mo),pcb:+pcb||0,adv:+o.adv||0,auto}}
+function slipInput(w){const mo=$("monthFilter").value;if(!mo)return;const a=slipAll();
+  a[mo]=Object.assign(a[mo]||{},{days:Math.max(0,+$("slDays").value||0),adv:Math.max(0,+$("slAdv").value||0)},w==="pcb"?{pcb:Math.max(0,+$("slPcb").value||0)}:{});wr(SLK,JSON.stringify(a));renderSlip(true);updateNetChip()}
+const c5=x=>Math.ceil(x*20-1e-9)/20;
+function slipCalc(mo){const s=getSettings(),i=slipIn(mo),rs=getRecords().filter(r=>r.date.startsWith(mo));
+  const hrs=i.days*7.5,basic=hrs*s.base,ot=rs.reduce((a,r)=>a+(+r.otPay||0),0),gross=basic+ot;
+  const up=Math.ceil(Math.round(basic*100)/100/20-1e-9)*20,epf=Math.ceil((basic<=5000?up:basic)*0.11-1e-9);
+  const mid=gross>0?Math.ceil(Math.min(gross,6000)/100)*100-50:0,soc=c5(0.005*mid),eis=c5(0.002*mid);
+  return{i,hrs,basic,ot,gross,epf,eis,soc,skbbk:s.skbbk,rate:s.base,net:gross-epf-eis-soc-i.pcb-s.skbbk-i.adv}}
+function renderSlip(keep){const mo=$("monthFilter").value,o=$("slipOut");
+  if(!mo){o.textContent="Pilih bulan di atas untuk lihat slip gaji.";return}
+  if(!keep){const i=slipIn(mo);$("slDays").value=i.days;$("slPcb").value=i.pcb;$("slAdv").value=i.adv}
+  const c=slipCalc(mo);o.innerHTML="";
+  const row=(l,v,cls)=>{const d=document.createElement("div"),a=document.createElement("span"),b=document.createElement("span");d.className="srow"+(cls?" "+cls:"");a.textContent=l;b.textContent=v;d.append(a,b);o.appendChild(d)},m=x=>"-"+money(x);
+  row("Gaji asas ("+c.hrs+" jam x "+money(c.rate).slice(2)+")",money(c.basic));
+  row("Jumlah OT",money(c.ot));row("Jumlah kasar",money(c.gross),"b");
+  row("EPF pekerja (11%)",m(c.epf));row("EIS",m(c.eis));row("SOCSO",m(c.soc));row("PCB"+(c.i.auto?" (anggaran, ikut bulan lalu)":""),m(c.i.pcb));row("SKBBK",m(c.skbbk));
+  if(c.i.adv)row("Advance",m(c.i.adv));
+  row("Gaji bersih",money(c.net),"tot")}
 function showPage(pg){const P={calc:["calcPage","tabCalc"],records:["recordsPage","tabRecords"],settings:["settingsPage","tabSettings"]};
   for(const k in P){$(P[k][0]).classList.toggle("hidden",k!==pg);$(P[k][1]).classList.toggle("active",k===pg)}
   if(pg==="records")renderRecords();if(pg==="settings"){loadRatesToForm();pinState()}}
